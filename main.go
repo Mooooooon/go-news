@@ -56,6 +56,7 @@ func main() {
 
 	// 注册路由
 	h := handler.NewHandler(db)
+	h.SetScheduler(sched)
 	h.RegisterRoutes(r)
 
 	// 启动服务

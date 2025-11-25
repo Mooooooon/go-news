@@ -3,6 +3,7 @@ package handler
 import (
 	"net/http"
 	"strconv"
+	"time"
 
 	"github.com/gin-gonic/gin"
 	"go-news/internal/model"
@@ -15,6 +16,11 @@ type Handler struct {
 	feed      *service.FeedService
 	llm       *service.LLMService
 	processor *service.ProcessorService
+	status    *service.StatusService
+	scheduler interface {
+		GetNextFetchTime() time.Time
+		GetNextProcessTime() time.Time
+	}
 }
 
 func NewHandler(db *gorm.DB) *Handler {
@@ -24,7 +30,16 @@ func NewHandler(db *gorm.DB) *Handler {
 		feed:      service.NewFeedService(db),
 		llm:       llm,
 		processor: service.NewProcessorService(db, llm),
+		status:    service.NewStatusService(db),
 	}
+}
+
+// SetScheduler 设置调度器引用
+func (h *Handler) SetScheduler(scheduler interface {
+	GetNextFetchTime() time.Time
+	GetNextProcessTime() time.Time
+}) {
+	h.scheduler = scheduler
 }
 
 func (h *Handler) RegisterRoutes(r *gin.Engine) {
@@ -33,6 +48,7 @@ func (h *Handler) RegisterRoutes(r *gin.Engine) {
 	r.GET("/feeds", h.FeedsPage)
 	r.GET("/articles", h.ArticlesPage)
 	r.GET("/settings", h.SettingsPage)
+	r.GET("/status", h.StatusPage)
 
 	// API
 	api := r.Group("/api")
@@ -54,6 +70,9 @@ func (h *Handler) RegisterRoutes(r *gin.Engine) {
 		// LLM
 		api.GET("/llm/models", h.GetLLMModels)
 		api.POST("/llm/test", h.TestLLMConnection)
+
+		// Status
+		api.GET("/status", h.GetStatus)
 	}
 }
 
@@ -226,4 +245,26 @@ func (h *Handler) TestLLMConnection(c *gin.Context) {
 		"message":  "连接成功",
 		"response": response,
 	})
+}
+
+// ===== Status相关 =====
+
+func (h *Handler) StatusPage(c *gin.Context) {
+	c.HTML(http.StatusOK, "status.html", nil)
+}
+
+func (h *Handler) GetStatus(c *gin.Context) {
+	status, err := h.status.GetSystemStatus()
+	if err != nil {
+		c.JSON(http.StatusInternalServerError, gin.H{"error": err.Error()})
+		return
+	}
+
+	// 添加定时任务信息
+	if h.scheduler != nil {
+		status.NextFetchTime = h.scheduler.GetNextFetchTime()
+		status.NextProcessTime = h.scheduler.GetNextProcessTime()
+	}
+
+	c.JSON(http.StatusOK, status)
 }

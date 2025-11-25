@@ -1,0 +1,167 @@
+<!DOCTYPE html>
+<html>
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>系统状态 - go-news</title>
+    <link rel="stylesheet" href="/static/style.css">
+</head>
+<body>
+    <nav>
+        <a href="/articles?status=processed">📰 文章</a>
+        <a href="/feeds">📡 订阅源</a>
+        <a href="/settings">⚙️ 设置</a>
+        <a href="/status">📊 状态</a>
+    </nav>
+    <main>
+        <div class="status-page">
+            <h2>系统状态</h2>
+
+            <div class="status-grid">
+                <div class="status-card">
+                    <h3>文章统计</h3>
+                    <div class="stat-item">
+                        <span class="stat-label">总计:</span>
+                        <span class="stat-value" id="total-articles">-</span>
+                    </div>
+                    <div class="stat-item">
+                        <span class="stat-label">待处理:</span>
+                        <span class="stat-value pending" id="pending-articles">-</span>
+                    </div>
+                    <div class="stat-item">
+                        <span class="stat-label">已处理:</span>
+                        <span class="stat-value processed" id="processed-articles">-</span>
+                    </div>
+                    <div class="stat-item">
+                        <span class="stat-label">已过滤:</span>
+                        <span class="stat-value filtered" id="filtered-articles">-</span>
+                    </div>
+                </div>
+
+                <div class="status-card">
+                    <h3>订阅源统计</h3>
+                    <div class="stat-item">
+                        <span class="stat-label">总计:</span>
+                        <span class="stat-value" id="total-feeds">-</span>
+                    </div>
+                    <div class="stat-item">
+                        <span class="stat-label">已启用:</span>
+                        <span class="stat-value enabled" id="enabled-feeds">-</span>
+                    </div>
+                </div>
+
+                <div class="status-card">
+                    <h3>定时任务</h3>
+                    <div class="stat-item">
+                        <span class="stat-label">下次抓取:</span>
+                        <span class="stat-value" id="next-fetch">-</span>
+                    </div>
+                    <div class="stat-item">
+                        <span class="stat-label">下次处理:</span>
+                        <span class="stat-value" id="next-process">-</span>
+                    </div>
+                    <div class="stat-item">
+                        <span class="stat-label">当前时间:</span>
+                        <span class="stat-value" id="current-time">-</span>
+                    </div>
+                </div>
+
+                <div class="status-card">
+                    <h3>处理进度</h3>
+                    <div class="progress-bar">
+                        <div class="progress-fill" id="progress-fill"></div>
+                        <div class="progress-text" id="progress-text">0%</div>
+                    </div>
+                    <div class="stat-item" style="margin-top: 1rem;">
+                        <span class="stat-label">完成率:</span>
+                        <span class="stat-value" id="completion-rate">-</span>
+                    </div>
+                </div>
+            </div>
+
+            <div class="actions" style="margin-top: 2rem;">
+                <button onclick="loadStatus()">🔄 刷新状态</button>
+            </div>
+        </div>
+    </main>
+
+    <script>
+    function formatTime(timeStr) {
+        if (!timeStr || timeStr === '0001-01-01T00:00:00Z') return '-';
+        const date = new Date(timeStr);
+        const now = new Date();
+        const diff = Math.floor((date - now) / 1000);
+
+        if (diff < 0) return '即将执行';
+        if (diff < 60) return `${diff} 秒后`;
+        if (diff < 3600) return `${Math.floor(diff / 60)} 分钟后`;
+        if (diff < 86400) return `${Math.floor(diff / 3600)} 小时后`;
+
+        return date.toLocaleString('zh-CN', {
+            year: 'numeric',
+            month: '2-digit',
+            day: '2-digit',
+            hour: '2-digit',
+            minute: '2-digit',
+            second: '2-digit'
+        });
+    }
+
+    function updateCurrentTime() {
+        const now = new Date();
+        document.getElementById('current-time').textContent = now.toLocaleString('zh-CN', {
+            year: 'numeric',
+            month: '2-digit',
+            day: '2-digit',
+            hour: '2-digit',
+            minute: '2-digit',
+            second: '2-digit'
+        });
+    }
+
+    async function loadStatus() {
+        try {
+            const resp = await fetch('/api/status');
+            const data = await resp.json();
+
+            // 文章统计
+            document.getElementById('total-articles').textContent = data.total_articles || 0;
+            document.getElementById('pending-articles').textContent = data.pending_articles || 0;
+            document.getElementById('processed-articles').textContent = data.processed_articles || 0;
+            document.getElementById('filtered-articles').textContent = data.filtered_articles || 0;
+
+            // 订阅源统计
+            document.getElementById('total-feeds').textContent = data.total_feeds || 0;
+            document.getElementById('enabled-feeds').textContent = data.enabled_feeds || 0;
+
+            // 定时任务
+            document.getElementById('next-fetch').textContent = formatTime(data.next_fetch_time);
+            document.getElementById('next-process').textContent = formatTime(data.next_process_time);
+
+            // 计算处理进度
+            const total = data.total_articles || 0;
+            const pending = data.pending_articles || 0;
+            const processed = (data.processed_articles || 0) + (data.filtered_articles || 0);
+            const percentage = total > 0 ? Math.round((processed / total) * 100) : 0;
+
+            document.getElementById('progress-fill').style.width = percentage + '%';
+            document.getElementById('progress-text').textContent = percentage + '%';
+            document.getElementById('completion-rate').textContent = `${processed} / ${total} (${percentage}%)`;
+
+        } catch (err) {
+            console.error('加载状态失败:', err);
+        }
+    }
+
+    // 页面加载时执行
+    loadStatus();
+    updateCurrentTime();
+
+    // 每秒更新当前时间
+    setInterval(updateCurrentTime, 1000);
+
+    // 每5秒自动刷新状态
+    setInterval(loadStatus, 5000);
+    </script>
+</body>
+</html>
