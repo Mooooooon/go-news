@@ -1,6 +1,7 @@
 package handler
 
 import (
+	"context"
 	"net/http"
 	"strconv"
 	"time"
@@ -157,7 +158,8 @@ func (h *Handler) ListArticles(c *gin.Context) {
 }
 
 func (h *Handler) ProcessArticles(c *gin.Context) {
-	go h.processor.ProcessPendingArticles(c.Request.Context(), 10)
+	// 使用独立的 context,不受 HTTP 请求生命周期影响
+	go h.processor.ProcessPendingArticles(context.Background(), 10)
 	c.JSON(http.StatusOK, gin.H{"message": "processing started"})
 }
 
