@@ -50,6 +50,10 @@ func (h *Handler) RegisterRoutes(r *gin.Engine) {
 		// Config
 		api.GET("/config", h.GetConfig)
 		api.POST("/config", h.SaveConfig)
+
+		// LLM
+		api.GET("/llm/models", h.GetLLMModels)
+		api.POST("/llm/test", h.TestLLMConnection)
 	}
 }
 
@@ -193,4 +197,33 @@ func (h *Handler) SettingsPage(c *gin.Context) {
 	}
 
 	c.HTML(http.StatusOK, "settings.html", gin.H{"config": configMap})
+}
+
+// ===== LLM相关 =====
+
+func (h *Handler) GetLLMModels(c *gin.Context) {
+	models, err := h.llm.GetModels(c.Request.Context())
+	if err != nil {
+		c.JSON(http.StatusInternalServerError, gin.H{"error": err.Error()})
+		return
+	}
+
+	c.JSON(http.StatusOK, gin.H{"models": models})
+}
+
+func (h *Handler) TestLLMConnection(c *gin.Context) {
+	response, err := h.llm.TestConnection(c.Request.Context())
+	if err != nil {
+		c.JSON(http.StatusInternalServerError, gin.H{
+			"success": false,
+			"error":   err.Error(),
+		})
+		return
+	}
+
+	c.JSON(http.StatusOK, gin.H{
+		"success":  true,
+		"message":  "连接成功",
+		"response": response,
+	})
 }

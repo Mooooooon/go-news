@@ -36,8 +36,13 @@
                     </label>
                     <label>
                         模型
-                        <input type="text" name="llm_model" value="{{.config.llm_model}}">
+                        <input type="text" name="llm_model" id="llm_model" value="{{.config.llm_model}}">
                     </label>
+                    <div class="button-group">
+                        <button type="button" onclick="getModels()">📋 获取模型列表</button>
+                        <button type="button" onclick="testConnection()">🔌 测试连接</button>
+                    </div>
+                    <div id="test-result" class="test-result"></div>
                 </fieldset>
 
                 <fieldset>
@@ -74,6 +79,63 @@
         });
 
         alert('保存成功');
+    }
+
+    async function getModels() {
+        const resultDiv = document.getElementById('test-result');
+        resultDiv.innerHTML = '<p style="color: #666;">正在获取模型列表...</p>';
+
+        try {
+            const resp = await fetch('/api/llm/models');
+            const data = await resp.json();
+
+            if (resp.ok && data.models) {
+                if (data.models.length === 0) {
+                    resultDiv.innerHTML = '<p style="color: #ff9800;">未找到可用模型</p>';
+                    return;
+                }
+
+                const modelList = data.models.map(m =>
+                    `<div class="model-item" onclick="selectModel('${m}')">${m}</div>`
+                ).join('');
+
+                resultDiv.innerHTML = `
+                    <p style="color: #4caf50; margin-bottom: 8px;">找到 ${data.models.length} 个模型,点击选择:</p>
+                    <div class="model-list">${modelList}</div>
+                `;
+            } else {
+                resultDiv.innerHTML = `<p style="color: #f44336;">❌ ${data.error || '获取失败'}</p>`;
+            }
+        } catch (err) {
+            resultDiv.innerHTML = `<p style="color: #f44336;">❌ 请求失败: ${err.message}</p>`;
+        }
+    }
+
+    function selectModel(modelId) {
+        document.getElementById('llm_model').value = modelId;
+        document.getElementById('test-result').innerHTML =
+            `<p style="color: #4caf50;">✅ 已选择模型: ${modelId}</p>`;
+    }
+
+    async function testConnection() {
+        const resultDiv = document.getElementById('test-result');
+        resultDiv.innerHTML = '<p style="color: #666;">正在测试连接...</p>';
+
+        try {
+            const resp = await fetch('/api/llm/test', {method: 'POST'});
+            const data = await resp.json();
+
+            if (data.success) {
+                resultDiv.innerHTML = `
+                    <p style="color: #4caf50;">✅ ${data.message}</p>
+                    <p style="color: #666;">LLM 响应: ${data.response}</p>
+                `;
+            } else {
+                resultDiv.innerHTML = `<p style="color: #f44336;">❌ ${data.error}</p>`;
+            }
+        } catch (err) {
+            resultDiv.innerHTML = `<p style="color: #f44336;">❌ 请求失败: ${err.message}</p>`;
+        }
     }
     </script>
 </body>
