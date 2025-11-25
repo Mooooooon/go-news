@@ -1,0 +1,41 @@
+{{define "content"}}
+<div class="articles-page">
+    <div class="tabs">
+        <a href="?status=processed" class="{{if eq .status "processed"}}active{{end}}">已处理</a>
+        <a href="?status=pending" class="{{if eq .status "pending"}}active{{end}}">待处理</a>
+        <a href="?status=filtered" class="{{if eq .status "filtered"}}active{{end}}">已过滤</a>
+    </div>
+
+    <div class="actions">
+        <button onclick="processArticles()">🤖 处理文章</button>
+    </div>
+
+    <div id="articles-list"></div>
+</div>
+
+<script>
+const status = "{{.status}}";
+
+async function loadArticles(page = 1) {
+    const resp = await fetch(`/api/articles?status=${status}&page=${page}`);
+    const data = await resp.json();
+
+    const html = data.data.map(a => `
+        <div class="article-card">
+            <h3><a href="${a.link}" target="_blank">${a.title}</a></h3>
+            <div class="meta">${a.feed?.name || ''} · ${new Date(a.pub_date).toLocaleDateString()}</div>
+            ${a.summary ? `<p class="summary">${a.summary}</p>` : ''}
+        </div>
+    `).join('');
+
+    document.getElementById('articles-list').innerHTML = html;
+}
+
+async function processArticles() {
+    await fetch('/api/articles/process', {method: 'POST'});
+    alert('开始处理,请稍后刷新页面');
+}
+
+loadArticles();
+</script>
+{{end}}

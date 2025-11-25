@@ -1,0 +1,53 @@
+{{define "content"}}
+<div class="feeds-page">
+    <h2>订阅源管理</h2>
+
+    <form id="add-feed-form" onsubmit="addFeed(event)">
+        <input type="text" name="name" placeholder="名称" required>
+        <input type="url" name="url" placeholder="RSS URL" required>
+        <button type="submit">添加</button>
+    </form>
+
+    <div class="feeds-list">
+        {{range .feeds}}
+        <div class="feed-item" data-id="{{.ID}}">
+            <span class="name">{{.Name}}</span>
+            <span class="url">{{.URL}}</span>
+            <button onclick="fetchFeed({{.ID}})">抓取</button>
+            <button onclick="deleteFeed({{.ID}})">删除</button>
+        </div>
+        {{end}}
+    </div>
+</div>
+
+<script>
+async function addFeed(e) {
+    e.preventDefault();
+    const form = e.target;
+    const data = {
+        name: form.name.value,
+        url: form.url.value
+    };
+
+    await fetch('/api/feeds', {
+        method: 'POST',
+        headers: {'Content-Type': 'application/json'},
+        body: JSON.stringify(data)
+    });
+
+    location.reload();
+}
+
+async function fetchFeed(id) {
+    const resp = await fetch(`/api/feeds/${id}/fetch`, {method: 'POST'});
+    const data = await resp.json();
+    alert(`抓取完成,新增 ${data.new_articles} 篇文章`);
+}
+
+async function deleteFeed(id) {
+    if (!confirm('确定删除?')) return;
+    await fetch(`/api/feeds/${id}`, {method: 'DELETE'});
+    location.reload();
+}
+</script>
+{{end}}

@@ -1,0 +1,64 @@
+{{define "content"}}
+<div class="settings-page">
+    <h2>系统设置</h2>
+
+    <form id="settings-form" onsubmit="saveSettings(event)">
+        <fieldset>
+            <legend>LLM配置</legend>
+            <label>
+                提供商
+                <select name="llm_provider">
+                    <option value="openai" {{if eq .config.llm_provider "openai"}}selected{{end}}>OpenAI</option>
+                    <option value="ollama" {{if eq .config.llm_provider "ollama"}}selected{{end}}>Ollama</option>
+                </select>
+            </label>
+            <label>
+                API地址
+                <input type="url" name="llm_api_url" value="{{.config.llm_api_url}}">
+            </label>
+            <label>
+                API密钥
+                <input type="password" name="llm_api_key" value="{{.config.llm_api_key}}">
+            </label>
+            <label>
+                模型
+                <input type="text" name="llm_model" value="{{.config.llm_model}}">
+            </label>
+        </fieldset>
+
+        <fieldset>
+            <legend>提示词</legend>
+            <label>
+                筛选提示词
+                <textarea name="prompt_filter" rows="5">{{.config.prompt_filter}}</textarea>
+            </label>
+            <label>
+                摘要提示词
+                <textarea name="prompt_summary" rows="5">{{.config.prompt_summary}}</textarea>
+            </label>
+        </fieldset>
+
+        <button type="submit">保存设置</button>
+    </form>
+</div>
+
+<script>
+async function saveSettings(e) {
+    e.preventDefault();
+    const form = e.target;
+    const data = {};
+
+    new FormData(form).forEach((value, key) => {
+        data[key] = value;
+    });
+
+    await fetch('/api/config', {
+        method: 'POST',
+        headers: {'Content-Type': 'application/json'},
+        body: JSON.stringify(data)
+    });
+
+    alert('保存成功');
+}
+</script>
+{{end}}
