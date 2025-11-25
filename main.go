@@ -8,6 +8,7 @@ import (
 	"gorm.io/driver/sqlite"
 	"gorm.io/gorm"
 
+	"go-news/config"
 	"go-news/internal/handler"
 	"go-news/internal/model"
 	"go-news/internal/scheduler"
@@ -15,8 +16,17 @@ import (
 )
 
 func main() {
+	// 加载配置文件
+	cfg, err := config.Load("config.yaml")
+	if err != nil {
+		log.Fatal("Failed to load config:", err)
+	}
+
+	// 设置 Gin 模式
+	gin.SetMode(cfg.Server.Mode)
+
 	// 初始化数据库
-	db, err := gorm.Open(sqlite.Open("data/news.db"), &gorm.Config{})
+	db, err := gorm.Open(sqlite.Open(cfg.Database.Path), &gorm.Config{})
 	if err != nil {
 		log.Fatal("Failed to connect database:", err)
 	}
@@ -33,7 +43,7 @@ func main() {
 	processorSvc := service.NewProcessorService(db, llmSvc)
 
 	// 启动定时任务
-	sched := scheduler.NewScheduler(feedSvc, processorSvc)
+	sched := scheduler.NewScheduler(feedSvc, processorSvc, cfg.Cron)
 	sched.Start()
 	defer sched.Stop()
 
@@ -49,8 +59,10 @@ func main() {
 	h.RegisterRoutes(r)
 
 	// 启动服务
-	log.Println("Server starting on :8080")
-	r.Run(":8080")
+	addr := cfg.GetServerAddress()
+	log.Printf("Server starting on %s", addr)
+	log.Printf("Access at: http://localhost%s", addr)
+	r.Run(addr)
 }
 
 func initDefaultConfig(db *gorm.DB) {

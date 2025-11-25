@@ -1,53 +1,69 @@
-{{define "content"}}
-<div class="feeds-page">
-    <h2>订阅源管理</h2>
+<!DOCTYPE html>
+<html>
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>订阅源管理 - go-news</title>
+    <link rel="stylesheet" href="/static/style.css">
+</head>
+<body>
+    <nav>
+        <a href="/articles?status=processed">📰 文章</a>
+        <a href="/feeds">📡 订阅源</a>
+        <a href="/settings">⚙️ 设置</a>
+    </nav>
+    <main>
+        <div class="feeds-page">
+            <h2>订阅源管理</h2>
 
-    <form id="add-feed-form" onsubmit="addFeed(event)">
-        <input type="text" name="name" placeholder="名称" required>
-        <input type="url" name="url" placeholder="RSS URL" required>
-        <button type="submit">添加</button>
-    </form>
+            <form id="add-feed-form" onsubmit="addFeed(event)">
+                <input type="text" name="name" placeholder="名称" required>
+                <input type="url" name="url" placeholder="RSS URL" required>
+                <button type="submit">添加</button>
+            </form>
 
-    <div class="feeds-list">
-        {{range .feeds}}
-        <div class="feed-item" data-id="{{.ID}}">
-            <span class="name">{{.Name}}</span>
-            <span class="url">{{.URL}}</span>
-            <button onclick="fetchFeed({{.ID}})">抓取</button>
-            <button onclick="deleteFeed({{.ID}})">删除</button>
+            <div class="feeds-list">
+                {{range .feeds}}
+                <div class="feed-item" data-id="{{.ID}}">
+                    <span class="name">{{.Name}}</span>
+                    <span class="url">{{.URL}}</span>
+                    <button onclick="fetchFeed({{.ID}})">抓取</button>
+                    <button onclick="deleteFeed({{.ID}})">删除</button>
+                </div>
+                {{end}}
+            </div>
         </div>
-        {{end}}
-    </div>
-</div>
+    </main>
 
-<script>
-async function addFeed(e) {
-    e.preventDefault();
-    const form = e.target;
-    const data = {
-        name: form.name.value,
-        url: form.url.value
-    };
+    <script>
+    async function addFeed(e) {
+        e.preventDefault();
+        const form = e.target;
+        const data = {
+            name: form.name.value,
+            url: form.url.value
+        };
 
-    await fetch('/api/feeds', {
-        method: 'POST',
-        headers: {'Content-Type': 'application/json'},
-        body: JSON.stringify(data)
-    });
+        await fetch('/api/feeds', {
+            method: 'POST',
+            headers: {'Content-Type': 'application/json'},
+            body: JSON.stringify(data)
+        });
 
-    location.reload();
-}
+        location.reload();
+    }
 
-async function fetchFeed(id) {
-    const resp = await fetch(`/api/feeds/${id}/fetch`, {method: 'POST'});
-    const data = await resp.json();
-    alert(`抓取完成,新增 ${data.new_articles} 篇文章`);
-}
+    async function fetchFeed(id) {
+        const resp = await fetch(`/api/feeds/${id}/fetch`, {method: 'POST'});
+        const data = await resp.json();
+        alert(`抓取完成,新增 ${data.new_articles} 篇文章`);
+    }
 
-async function deleteFeed(id) {
-    if (!confirm('确定删除?')) return;
-    await fetch(`/api/feeds/${id}`, {method: 'DELETE'});
-    location.reload();
-}
-</script>
-{{end}}
+    async function deleteFeed(id) {
+        if (!confirm('确定删除?')) return;
+        await fetch(`/api/feeds/${id}`, {method: 'DELETE'});
+        location.reload();
+    }
+    </script>
+</body>
+</html>

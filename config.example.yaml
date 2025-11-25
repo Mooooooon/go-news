@@ -1,0 +1,28 @@
+# go-news 配置文件示例
+# 复制此文件为 config.yaml 并根据需要修改
+
+server:
+  # 服务器端口 (默认: 3000)
+  port: "3000"
+
+  # 运行模式: debug, release (默认: debug)
+  mode: "debug"
+
+database:
+  # SQLite 数据库文件路径 (默认: data/news.db)
+  path: "data/news.db"
+
+cron:
+  # RSS 抓取间隔 (cron 表达式, 默认: 每30分钟)
+  # 格式: 分 时 日 月 周
+  fetch_interval: "*/30 * * * *"
+
+  # 文章处理间隔 (cron 表达式, 默认: 每10分钟)
+  process_interval: "*/10 * * * *"
+
+# 常用 cron 表达式示例:
+# */5 * * * *    - 每5分钟
+# */15 * * * *   - 每15分钟
+# 0 * * * *      - 每小时
+# 0 */2 * * *    - 每2小时
+# 0 0 * * *      - 每天凌晨
