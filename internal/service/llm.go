@@ -24,6 +24,7 @@ type LLMConfig struct {
 	Model    string
 }
 
+// OpenAI 格式
 type ChatRequest struct {
 	Model    string    `json:"model"`
 	Messages []Message `json:"messages"`
@@ -38,6 +39,31 @@ type ChatResponse struct {
 	Choices []struct {
 		Message Message `json:"message"`
 	} `json:"choices"`
+}
+
+// Google AI 格式
+type GoogleChatRequest struct {
+	Contents []struct {
+		Role  string `json:"role"`
+		Parts []struct {
+			Text string `json:"text"`
+		} `json:"parts"`
+	} `json:"contents"`
+	SystemInstruction *struct {
+		Parts []struct {
+			Text string `json:"text"`
+		} `json:"parts"`
+	} `json:"systemInstruction,omitempty"`
+}
+
+type GoogleChatResponse struct {
+	Candidates []struct {
+		Content struct {
+			Parts []struct {
+				Text string `json:"text"`
+			} `json:"parts"`
+		} `json:"content"`
+	} `json:"candidates"`
 }
 
 type ModelsResponse struct {
@@ -81,6 +107,18 @@ func (s *LLMService) Chat(ctx context.Context, prompt, content string) (string, 
 		return "", err
 	}
 
+	// 根据 provider 选择不同的实现
+	switch cfg.Provider {
+	case "google":
+		return s.chatGoogle(ctx, cfg, prompt, content)
+	default:
+		// openai, ollama 等使用 OpenAI 兼容格式
+		return s.chatOpenAI(ctx, cfg, prompt, content)
+	}
+}
+
+// chatOpenAI OpenAI 兼容格式 (OpenAI, Ollama 等)
+func (s *LLMService) chatOpenAI(ctx context.Context, cfg *LLMConfig, prompt, content string) (string, error) {
 	reqBody := ChatRequest{
 		Model: cfg.Model,
 		Messages: []Message{
@@ -110,7 +148,7 @@ func (s *LLMService) Chat(ctx context.Context, prompt, content string) (string, 
 
 	var chatResp ChatResponse
 	if err := json.Unmarshal(body, &chatResp); err != nil {
-		return "", err
+		return "", fmt.Errorf("解析响应失败: %v, body: %s", err, string(body))
 	}
 
 	if len(chatResp.Choices) == 0 {
@@ -118,6 +156,74 @@ func (s *LLMService) Chat(ctx context.Context, prompt, content string) (string, 
 	}
 
 	return chatResp.Choices[0].Message.Content, nil
+}
+
+// chatGoogle Google AI Studio 格式
+func (s *LLMService) chatGoogle(ctx context.Context, cfg *LLMConfig, prompt, content string) (string, error) {
+	reqBody := GoogleChatRequest{
+		Contents: []struct {
+			Role  string `json:"role"`
+			Parts []struct {
+				Text string `json:"text"`
+			} `json:"parts"`
+		}{
+			{
+				Role: "user",
+				Parts: []struct {
+					Text string `json:"text"`
+				}{
+					{Text: content},
+				},
+			},
+		},
+	}
+
+	// 添加 system instruction
+	if prompt != "" {
+		reqBody.SystemInstruction = &struct {
+			Parts []struct {
+				Text string `json:"text"`
+			} `json:"parts"`
+		}{
+			Parts: []struct {
+				Text string `json:"text"`
+			}{
+				{Text: prompt},
+			},
+		}
+	}
+
+	jsonBody, _ := json.Marshal(reqBody)
+
+	// Google API 格式: /v1beta/models/{model}:generateContent?key={apiKey}
+	url := fmt.Sprintf("%s/v1beta/models/%s:generateContent?key=%s",
+		cfg.ApiURL, cfg.Model, cfg.ApiKey)
+
+	req, err := http.NewRequestWithContext(ctx, "POST", url, bytes.NewBuffer(jsonBody))
+	if err != nil {
+		return "", err
+	}
+
+	req.Header.Set("Content-Type", "application/json")
+
+	resp, err := s.client.Do(req)
+	if err != nil {
+		return "", err
+	}
+	defer resp.Body.Close()
+
+	body, _ := io.ReadAll(resp.Body)
+
+	var googleResp GoogleChatResponse
+	if err := json.Unmarshal(body, &googleResp); err != nil {
+		return "", fmt.Errorf("解析响应失败: %v, body: %s", err, string(body))
+	}
+
+	if len(googleResp.Candidates) == 0 || len(googleResp.Candidates[0].Content.Parts) == 0 {
+		return "", fmt.Errorf("no response from Google AI")
+	}
+
+	return googleResp.Candidates[0].Content.Parts[0].Text, nil
 }
 
 // GetPrompt 获取提示词
@@ -185,45 +291,6 @@ func (s *LLMService) TestConnection(ctx context.Context) (string, error) {
 		return "", fmt.Errorf("模型未配置")
 	}
 
-	// 发送测试消息
-	reqBody := ChatRequest{
-		Model: cfg.Model,
-		Messages: []Message{
-			{Role: "user", Content: "Hi"},
-		},
-	}
-
-	jsonBody, _ := json.Marshal(reqBody)
-
-	req, err := http.NewRequestWithContext(ctx, "POST",
-		cfg.ApiURL+"/chat/completions", bytes.NewBuffer(jsonBody))
-	if err != nil {
-		return "", fmt.Errorf("创建请求失败: %v", err)
-	}
-
-	req.Header.Set("Content-Type", "application/json")
-	req.Header.Set("Authorization", "Bearer "+cfg.ApiKey)
-
-	resp, err := s.client.Do(req)
-	if err != nil {
-		return "", fmt.Errorf("请求失败: %v", err)
-	}
-	defer resp.Body.Close()
-
-	body, _ := io.ReadAll(resp.Body)
-
-	if resp.StatusCode != http.StatusOK {
-		return "", fmt.Errorf("API返回错误 (%d): %s", resp.StatusCode, string(body))
-	}
-
-	var chatResp ChatResponse
-	if err := json.Unmarshal(body, &chatResp); err != nil {
-		return "", fmt.Errorf("解析响应失败: %v", err)
-	}
-
-	if len(chatResp.Choices) == 0 {
-		return "", fmt.Errorf("未收到LLM响应")
-	}
-
-	return chatResp.Choices[0].Message.Content, nil
+	// 使用 Chat 方法进行测试,会自动选择正确的 provider
+	return s.Chat(ctx, "", "Hi")
 }

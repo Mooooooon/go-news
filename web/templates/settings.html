@@ -22,14 +22,16 @@
                     <legend>LLM配置</legend>
                     <label>
                         提供商
-                        <select name="llm_provider">
+                        <select name="llm_provider" id="llm_provider" onchange="updateProviderHints()">
                             <option value="openai" {{if eq .config.llm_provider "openai"}}selected{{end}}>OpenAI</option>
                             <option value="ollama" {{if eq .config.llm_provider "ollama"}}selected{{end}}>Ollama</option>
+                            <option value="google" {{if eq .config.llm_provider "google"}}selected{{end}}>Google AI Studio</option>
                         </select>
                     </label>
                     <label>
                         API地址
-                        <input type="url" name="llm_api_url" value="{{.config.llm_api_url}}">
+                        <input type="url" name="llm_api_url" id="llm_api_url" value="{{.config.llm_api_url}}">
+                        <small id="api_url_hint" style="color: #666; font-size: 0.85rem;"></small>
                     </label>
                     <label>
                         API密钥
@@ -138,6 +140,32 @@
             resultDiv.innerHTML = `<p style="color: #f44336;">❌ 请求失败: ${err.message}</p>`;
         }
     }
+
+    function updateProviderHints() {
+        const provider = document.getElementById('llm_provider').value;
+        const apiUrlInput = document.getElementById('llm_api_url');
+        const apiUrlHint = document.getElementById('api_url_hint');
+
+        switch(provider) {
+            case 'openai':
+                apiUrlHint.textContent = '示例: https://api.openai.com/v1';
+                if (!apiUrlInput.value) apiUrlInput.value = 'https://api.openai.com/v1';
+                break;
+            case 'ollama':
+                apiUrlHint.textContent = '示例: http://localhost:11434/v1';
+                if (!apiUrlInput.value) apiUrlInput.value = 'http://localhost:11434/v1';
+                break;
+            case 'google':
+                apiUrlHint.textContent = '示例: https://generativelanguage.googleapis.com';
+                if (!apiUrlInput.value || apiUrlInput.value.includes('openai') || apiUrlInput.value.includes('ollama')) {
+                    apiUrlInput.value = 'https://generativelanguage.googleapis.com';
+                }
+                break;
+        }
+    }
+
+    // 页面加载时更新提示
+    window.addEventListener('DOMContentLoaded', updateProviderHints);
     </script>
 </body>
 </html>
